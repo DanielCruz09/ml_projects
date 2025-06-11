@@ -8,13 +8,14 @@ import pandas as pd
 from skimage.transform import resize
 import numpy as np
 from PIL import Image
-from tensorflow.keras import models, layers
 import tensorflow as tf
+from keras import models, layers
 from sklearn.utils import shuffle
 from sklearn.model_selection import train_test_split
 from plotnine import *
 
 # create a csv: filename, width, height, depth, xmin, ymin, xmax, ymax
+text = ''
 def write_to_csv(filepath:str, output_path:str) -> None:
     """
 
@@ -31,11 +32,12 @@ def write_to_csv(filepath:str, output_path:str) -> None:
     tree = ET.parse(filepath)
     root = tree.getroot()
 
-    header_missing = False
-    with open(output_path, 'r') as csvfile:
-        # check if the file has a header
-        first_line = csvfile.readline()
-        header_missing = not first_line.strip() 
+    # header_missing = False
+    # with open(output_path, 'r') as csvfile:
+    #     # check if the file has a header
+    #     first_line = csvfile.readline()
+    #     header_missing = not first_line.strip() 
+    
         
     # write contents
     text = ''
@@ -55,10 +57,6 @@ def write_to_csv(filepath:str, output_path:str) -> None:
             break
 
     with open(output_path, 'a') as csvfile:
-        if header_missing:
-            header = 'Filename,Width,Height,Depth,Xmin,Ymin,Xmax,Ymax'
-            csvfile.write(header)
-            csvfile.write('\n')
         csvfile.write(text)
         csvfile.write('\n')
 
@@ -622,14 +620,25 @@ def main():
 
     write = False # Set this to true to write XML files to CSV
     if write:
-        path = 'Sohas_weapon-Detection/annotations/xmls/'
+
+        with open('weapons.csv', 'a') as csvfile:
+            header = 'Filename,Width,Height,Depth,Xmin,Ymin,Xmax,Ymax'
+            csvfile.write(header)
+            csvfile.write('\n')
+
+        with open('weapons_test.csv', 'a') as csvfile:
+            header = 'Filename,Width,Height,Depth,Xmin,Ymin,Xmax,Ymax'
+            csvfile.write(header)
+            csvfile.write('\n')
+
+        path = 'datasets/Sohas_weapon-Detection/annotations/xmls/'
 
         for filename in os.listdir(path):
             file_path = os.path.join(path, filename)
             if os.path.isfile(file_path):
                 write_to_csv(file_path, 'weapons.csv')
 
-        test_path = 'Sohas_weapon-Detection/annotations_test/xmls/'
+        test_path = 'datasets/Sohas_weapon-Detection/annotations_test/xmls/'
 
         for filename in os.listdir(test_path):
             file_path = os.path.join(test_path, filename)
@@ -637,10 +646,10 @@ def main():
                 write_to_csv(file_path, 'weapons_test.csv')
 
     # Get min dimensions
-    weapons_data = pd.read_csv('weapons_test.csv')
+    weapons_data = pd.read_csv('datasets/weapons_test.csv')
     min_width = weapons_data['Width'].min()
     min_height = weapons_data['Height'].min()
-    images_path = 'Sohas_weapon-Detection/images_test/'
+    images_path = 'datasets/Sohas_weapon-Detection/images_test/'
     
     img, labs = resize_images(images_path, min_width, min_height)
 
@@ -648,7 +657,6 @@ def main():
     labels = np.array(labs)
 
     training_X, training_y, testing_X, testing_y = shuffle_split_data(resized_images, labels, 72, 0.80)
-    print(type(training_X))
 
     # Input shape of (x, y, color channel)
     input_shape = (min_width, min_height, 3)
