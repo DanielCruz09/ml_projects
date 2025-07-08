@@ -7,6 +7,7 @@ import math
 import pandas as pd
 from skimage.transform import resize
 import numpy as np
+import random
 from PIL import Image
 # import tensorflow as tf
 # from keras import models, layers
@@ -17,6 +18,7 @@ from torchvision.io.image import decode_image
 from torchvision.models.detection import fasterrcnn_resnet50_fpn_v2, FasterRCNN_ResNet50_FPN_V2_Weights
 from torchvision.utils import draw_bounding_boxes
 from torchvision.transforms.functional import to_pil_image
+from torchvision import transforms
 
 # create a csv: filename, width, height, depth, xmin, ymin, xmax, ymax
 text = ''
@@ -90,19 +92,46 @@ def resize_images(images_path:str, resized_width:int, resized_height:int) -> tup
     # Resize images
     resized_images = []
     labels = []
+    count = 0
     for filename in os.listdir(images_path):
         file_path = os.path.join(images_path, filename)
         if os.path.isfile(file_path):
             img = Image.open(file_path)
-            img_data = np.asarray(img)
-            resized = resize(img_data, (resized_width, resized_height))
-            # print(resized.shape)
+            # With Scikit-Image:
+            # img_data = np.asarray(img)
+            # resized = resize(img_data, (resized_width, resized_height))
+            # resized_images.append(resized)
+
+            # With PyTorch:
+            resize_transform = transforms.Resize((resized_height, resized_width))
+            resized = resize_transform(img)
+
+            # Saves resized images
+            save = False
+            if save:
+                resized.save('img' + str(count) + '.jpg')
+            count += 1
+
+            to_tensor = transforms.ToTensor()
+            resized = to_tensor(resized)
             resized_images.append(resized)
+
             if has_weapon(file_path):
                 labels.append(1)
             else:
                 labels.append(0)
+    resized_images = np.array(resized_images)
     return resized_images, labels
+
+def shuffle_split_images(images, seed, train_percentage):
+    
+    random.seed(seed)
+
+    np.random.shuffle(images)
+    split_index = int(train_percentage * len(images))
+    training_X = images[:split_index]
+    testing_X = images[split_index:]
+    return training_X, testing_X
 
 def shuffle_split_data(images:np.array, labels:np.array, seed:int, train_percentage:float) -> tuple:
     """
@@ -160,11 +189,14 @@ def train_model(training_X):
     model = fasterrcnn_resnet50_fpn_v2(weights=weights, box_score_thresh=0.9)
     model.eval()
 
+    print(type(training_X[0]), training_X[0].shape)
+    img =  Image.fromarray((training_X[0] * 255).astype(np.uint8))
+
     # Step 2: Initialize the inference transforms
     preprocess = weights.transforms()
 
     # Step 3: Apply inference preprocessing transforms
-    batch = [preprocess(training_X)]
+    batch = [preprocess(img)]
 
     return weights, model, batch
 
@@ -215,22 +247,20 @@ def main():
     )
     min_width = weapons_data['Width'].min()
     min_height = weapons_data['Height'].min()
-    images_path = 'datasets/images_full'
+    images_path = 'resized_images'
     
-    img, labs = resize_images(images_path, min_width, min_height)
+    # img, labs = resize_images(images_path, min_width, min_height)
 
-    resized_images = np.array(img)
-    labels = np.array(labs)
+    # resized_images = np.array(img)
+    # labels = np.array(labs)
 
-    training_X, training_y, testing_X, testing_y = shuffle_split_data(resized_images, labels, 72, 0.80)
-    print(testing_X)
+    # training_X, training_y, testing_X, testing_y = shuffle_split_data(resized_images, labels, 72, 0.80)
 
-    # Input shape of (x, y, color channel)
-    input_shape = (min_width, min_height, 3)
+    # training_X, testing_X = shuffle_split_images(images=img, seed=72, train_percentage=0.75)
 
-    weights, model, batch = train_model(training_X)
-    img =  Image.fromarray(testing_X[0])
-    make_predictions(weights, img, model, batch)
+    # weights, model, batch = train_model(training_X)
+    # img =  Image.fromarray(testing_X[0], 'RGB')
+    # make_predictions(weights, img, model, batch)
 
 
 if __name__ == "__main__":
